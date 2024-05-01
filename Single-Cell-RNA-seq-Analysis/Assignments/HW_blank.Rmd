@@ -1,0 +1,261 @@
+---
+title: "W20 scRNA-seq data analysis with R - Assignment"
+author: "Giovanni"
+date: "2/11/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+all_times <- list()  # store the time for each chunk
+knitr::knit_hooks$set(time_it = local({
+  now <- NULL
+  function(before, options) {
+    if (before) {
+      now <<- Sys.time()
+    } else {
+      res <- difftime(Sys.time(), now, units = "secs")
+      all_times[[options$label]] <<- res
+    }
+  }
+}))
+knitr::opts_chunk$set(
+  tidy = TRUE,
+  tidy.opts = list(width.cutoff = 95),
+  message = FALSE,
+  warning = FALSE,
+  time_it = TRUE
+)
+```
+
+
+## Instructions
+
+You will be working with a publicly-available dataset extracted from the 10X genomics website. This dataset consists of Non-Small Cell Lung Cancer (NSCLC) dissociated tumor cells from a donor [source](https://www.10xgenomics.com/resources/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-3-1-standard-6-1-0).  
+
+Above each chunk, you will find the task that you need to complete. Write the code necessary inside each chunk (delimited by the triple ` mark). Notice some chunks already include some code. Please preserve this code as they print/show relevant output. Also describe your observations/interpretations under the chunk. You will be graded on both the code implementation and your interpretation of the plots/table output. Not all tasks need to be commented as some of them are very trivial. You can just comment once for the overall section (marked by ##). Also, I mentioned that the best practice is to try out different cutoffs and check for consistency. Here you do not need to do that. You can just stick to the tasks. 
+
+When you finish all the tasks press the "Knit" button at the top. This will generate an html/pdf file of the entire markdown. Please submit this file for grading via email to `giovas@ucla.edu`. Replace my name with yours in line 3 and include it in the file name. NOTE: This function will rerun the entire code so it can take a while. This command can be buggy sometimes, so if you don't succeed to convert the markdown to PDF or HTML then you can just submit the completed Rmd file. 
+
+## Load the data
+
+Replace the data.dir value with the location where you downloaded the data. 
+No results to interpret here. 
+```{r init}
+
+library(Seurat)
+library(patchwork)
+library(dplyr)
+
+nsclc.data <- Read10X(data.dir = "/path/to/my/folder/sample_feature_bc_matrix/")
+
+# Initialize the Seurat object with the raw (non-normalized data).
+df <- CreateSeuratObject(counts = nsclc.data$`Gene Expression`, 
+                         project = "NSCLC", min.cells = 3, min.features = 200)
+df
+```
+## Quality Control
+
+**Task 1: Filter cells based on gene count and mitochondrial RNA content. Use your judgment to select the cutoffs and justify.**
+
+**Task 2: Plot a scatter plot of RNA count vs Feature count. Does this plot show additional cells that may need to be filtered? **
+
+**Task 3: Subset your Seurat Object (df) based on your filtering criteria. ** 
+
+```{r QC}
+print(paste("cells before filtering", dim(df)[2], sep = " "))
+
+# Task 1
+# Task 2
+# Task 3
+
+print(paste("cells after filtering", dim(df)[2], sep = " "))
+
+```
+
+## Data Normalization
+
+**Task 4: Normalize the data using a scale factor of 1,000,000. **
+
+```{r norm}
+
+# Task 4
+
+```
+
+## Highly Variable Genes (HVG)
+
+**Task 5: Select the top 5k most variable genes using the `vst` method. Do not overwrite `df`, define new variable `df1`. **
+
+**Task 6: Select the top 5k most variable genes using the `mean.var.plot` method. Do not overwrite `df`, define new variable `df2`.**
+
+**Task 7: print the overlap of HVG from these two methods. (Done for you)**
+
+**Task 8: Now re-define `df` using the `vst` method for HVG selection and 5k features.**
+
+```{r HVG}
+
+# Task 5
+
+# Task 6
+
+# Task 7 
+s <- intersect(VariableFeatures(df1), VariableFeatures(df2))
+print(paste("Common HVG genes from the two methods:", length(s), sep = " "))
+
+# Task 8
+
+```
+
+## PCA part 1
+
+The goal here is to perform data scaling followed by PCA by using a) only HVG and b) all gene and compare the output from both. At the last step you will need to settle for one of these approaches. 
+
+**Task 9:  Scale the data using the HVG genes only. Do not overwrite `df`, direct output to `df1` instead. **
+
+**Task 10: Perform PCA on `df1`. **
+
+**Task 11: Scale the data using all genes. Do not rewrite `df`, direct output to `df2` instead. Hint: you can get the list of all genes in the rownames. **
+
+**Task 12: Perform PCA on `df2`.**
+
+**Task 13: Plot the cells in the PC space for `df1` and `df2`. **
+
+**Task 14: Select between `df1` and `df2` to overwrite `df`. **
+
+
+```{r VarExplained function}
+# do not modify this cell. You will use this function later. 
+VarExplained <- function(SeuratObj){
+  mat1 <- Seurat::GetAssayData(SeuratObj, assay = "RNA", slot = "scale.data")
+  pca1 <- SeuratObj[["pca"]]
+  eigValues = (pca1@stdev)^2  ## EigenValues
+  total_variance <- sum(matrixStats::rowVars(mat1))
+  varExplained = eigValues / total_variance
+  varExplained_2pcs <- (varExplained[1] + varExplained[2] )*100
+  varExplained_2pcs  <- paste(round(varExplained_2pcs , 2), "%", sep="")
+  return(varExplained_2pcs )
+} 
+
+```
+
+```{r pca}
+
+# Task 9
+
+# Task 10
+
+print(paste("Variance explained by first 2 PCs:", VarExplained(df1), sep = " "))
+
+# Task 11
+
+# Task 12
+
+print(paste("Variance explained by first 2 PCs:", VarExplained(df2), sep = " "))
+
+# Task 13
+
+# Task 14
+```
+
+## PCA part 2
+
+**Task 15: Perform an elbow plot and select the number of dimensions you wish to use (it is better to be conservative).**
+
+**Task 16: define a new variable `max.n_pcs` with the number of PCs that you selected. **
+
+```{r ElbowPlot}
+
+# Task 15
+
+# Task 16
+
+max.n_pcs = #?
+```
+
+
+## Cell clustering
+
+**Task 17: Find the nearest neighbors for each cell, by considering the best number of dimensions (PCs) that you determined before. **
+
+**Task 18: Find cell clusters with resolution = 0.25.**
+
+```{r cluster}
+
+# Task 17
+
+# Task 18
+
+# Look at cluster IDs of the first 5 cells
+head(Idents(df), 5)
+```
+
+## Plot UMAP
+
+**Task 19: Run UMAP dimensionality reduction using `max.n_pcs` dimensions.**
+
+**Task 20: Plot the cells in the UMAP dimensions. **
+
+**Task 21: Admire plot. **
+```{r umap}
+# If you haven't installed UMAP, you can do so via reticulate::py_install(packages = "umap-learn")
+
+# Task 19
+
+# Task 20
+
+# Task 21
+
+```
+
+
+## Identify gene markers
+
+**Task 22: Identify the gene markers for all clusters. Require at least 25% presence of genes in the testable groups and logfc >= 0.25. (Very permissive) **
+
+```{r marker}
+
+# Task 22
+
+df.markers %>% group_by(cluster) %>% slice_max(n = 1, order_by = avg_log2FC)
+```
+
+
+## Feature Plot
+
+**Task 23: Perform a feature plot highlighting the top marker from each cluster. **
+
+```{r FeatPlot}
+
+# Task 23
+
+```
+
+## Assigning cell type identity to clusters
+
+**Task 24: Search the cell type associated with the top marker from each cluster in the marker database [Marker db](http://biocc.hrbmu.edu.cn/CellMarker/search.jsp). Then fill in the `new.cluster.ids` array with the name of the cell types you found.**
+
+```{r annot}
+
+# Task 23
+
+new.cluster.ids <- c()
+
+```
+
+
+**Task 25: Replot UMAP including the new cell cluster labels.**
+
+```{r labelplot}
+
+# Task 25
+
+```
+
+
+
+```{r}
+sessionInfo()
+```
+
